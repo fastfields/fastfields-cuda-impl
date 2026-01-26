@@ -1,0 +1,3 @@
+[submodule "kernels"]
+	path = kernels
+	url = git@github.com:fastfields/fastfields-kernels.git
