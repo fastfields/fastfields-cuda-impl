@@ -43,7 +43,7 @@ One header per module: `distance_euclidean.h`, `distance_l1.h`,
 - **No GPU in CI** — everything here is validated by compile+link only. Runtime
   correctness (atomics, the CUDA `stream` plumbing, the mesh `sdt` launcher) is
   unvalidated; see the tracked `fastfields-lib` issues.
-- **C++11**; namespaces via the `FF_NAMESPACE_BEGIN` macros (→ `ff::cuda::…`).
+- **C++17** (nvcc `-std=c++17`); namespaces via the `FF_NAMESPACE_BEGIN` macros (→ `ff::cuda::…`).
 - Keep it a structural mirror of `fastfields-cpu-impl` — port by analogy.
 
 ## Pointers
