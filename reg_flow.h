@@ -671,8 +671,11 @@ void kernel_absolute(
 
     flow_kp<ndim, offset_t> kp;
     kp.sc = stride[nall];
-    kp.sc2[0] = stride[nall];
-    kp.sc2[1] = stride[nall + 1];
+    // kp.sc2 is unused here (kernel_absolute reads only kp.sc below) -- leave it
+    // uninitialised rather than reading stride[nall + 1], which is past the end
+    // of this tensor's (*batch,*spatial,C) stride array (nall + 1 entries,
+    // indices 0..nall). Only kernel_lame/kernel_all's (*batch,*spatial,C,C)
+    // tensors have a real nall+1 entry to read into sc2[1].
     for (int d = 0; d < ndim; ++d) {
         kp.size[d] = size[nbatch + d]; kp.sout[d] = stride[nbatch + d];
     }
@@ -726,8 +729,7 @@ void kernel_membrane(
 
     flow_kp<ndim, offset_t> kp;
     kp.sc = stride[nall];
-    kp.sc2[0] = stride[nall];
-    kp.sc2[1] = stride[nall + 1];
+    // kp.sc2 unused here -- see kernel_absolute's comment above.
     for (int d = 0; d < ndim; ++d) {
         kp.size[d] = size[nbatch + d]; kp.sout[d] = stride[nbatch + d];
     }
@@ -782,8 +784,7 @@ void kernel_bending(
 
     flow_kp<ndim, offset_t> kp;
     kp.sc = stride[nall];
-    kp.sc2[0] = stride[nall];
-    kp.sc2[1] = stride[nall + 1];
+    // kp.sc2 unused here -- see kernel_absolute's comment above.
     for (int d = 0; d < ndim; ++d) {
         kp.size[d] = size[nbatch + d]; kp.sout[d] = stride[nbatch + d];
     }
