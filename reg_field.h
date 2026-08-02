@@ -2235,8 +2235,10 @@ void relax_bending_rls_(
 
     reduce_t* d_kernel = copyToDevice(kbuf.data(), static_cast<offset_t>(kbuf.size()));
     try {
-        // NB `2*niter`, NOT Colour::ncolour*niter -- mirrors the CPU launcher
-        // exactly (see the file header note). Do not "fix" here alone.
+        // NB `2*niter`, NOT Colour::ncolour*niter -- mirrors the CPU launcher's
+        // known bug exactly (fastfields-cpu-impl#51: this leaves most of the
+        // volume unrelaxed at ndim=3). Not fixed here on purpose: a fix needs
+        // to land on cpu-impl and cuda-impl together, per #51.
         for (offset_t n = 0; n < 2 * niter; ++n)
         for (int j = 0; j < Colour::nsub; ++j)
         {
@@ -2509,8 +2511,10 @@ void relax_bending_jrls_(
 
     reduce_t* d_kernel = copyToDevice(kbuf.data(), static_cast<offset_t>(kbuf.size()));
     try {
-        // NB `2*niter`, NOT Colour::ncolour*niter -- mirrors the CPU launcher
-        // exactly (see the file header note). Do not "fix" here alone.
+        // NB `2*niter`, NOT Colour::ncolour*niter -- mirrors the CPU launcher's
+        // known bug exactly (fastfields-cpu-impl#51: this leaves most of the
+        // volume unrelaxed at ndim=3). Not fixed here on purpose: a fix needs
+        // to land on cpu-impl and cuda-impl together, per #51.
         for (offset_t n = 0; n < 2 * niter; ++n)
         for (int j = 0; j < Colour::nsub; ++j)
         {
