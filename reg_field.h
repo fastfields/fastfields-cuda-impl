@@ -797,9 +797,14 @@ void matvec_absolute_jrls(
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
     offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out, _stride_out);
     offset_t stride_inp[nall+1];  fillfrom<nall+1>(stride_inp, _stride_inp);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     offset_t osc = stride_out[nall];
     offset_t isc = stride_inp[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);  // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_absolute];
@@ -813,7 +818,7 @@ void matvec_absolute_jrls(
 
         impl.template matvec_absolute_jrls<opfunc>(
             out + out_offset, inp + inp_offset, wgt + wgt_offset,
-            osc, isc, kernel);
+            osc, isc, wsc, kernel);
     }
 }
 
@@ -842,8 +847,13 @@ void diag_absolute_jrls(
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
     offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out, _stride_out);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     offset_t osc = stride_out[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);    // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_absolute];
@@ -855,7 +865,7 @@ void diag_absolute_jrls(
         offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
         impl.template diag_absolute_jrls<opfunc>(
-            out + out_offset, wgt + wgt_offset, osc, kernel);
+            out + out_offset, wgt + wgt_offset, osc, wsc, kernel);
     }
 }
 
@@ -893,10 +903,15 @@ void relax_absolute_jrls_(
     offset_t stride_sol[nall+1];  fillfrom<nall+1>(stride_sol, _stride_sol);
     offset_t stride_hes[nall+1];  fillfrom<nall+1>(stride_hes, _stride_hes);
     offset_t stride_grd[nall+1];  fillfrom<nall+1>(stride_grd, _stride_grd);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     offset_t osc = stride_sol[nall];
     offset_t hsc = stride_hes[nall];
     offset_t gsc = stride_grd[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);    // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_absolute];
@@ -920,12 +935,12 @@ void relax_absolute_jrls_(
         // minus convolution
         impl.template matvec_absolute_jrls<isub>(
             val, sol + sol_offset, wgt + wgt_offset,
-            static_cast<offset_t>(1), osc, kernel);
+            static_cast<offset_t>(1), osc, wsc, kernel);
 
         // diagonal
         impl.template diag_absolute_jrls<set>(
             diag, wgt + wgt_offset,
-            static_cast<offset_t>(1), kernel);
+            static_cast<offset_t>(1), wsc, kernel);
 
         // sol += (hes + diag) \ (grad - conv(sol))
         PosDef::relax_(
@@ -1179,10 +1194,15 @@ void matvec_membrane_jrls(
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
     offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out, _stride_out);
     offset_t stride_inp[nall+1];  fillfrom<nall+1>(stride_inp, _stride_inp);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t osc = stride_out[nall];
     offset_t isc = stride_inp[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);  // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_membrane_rls];
@@ -1198,7 +1218,7 @@ void matvec_membrane_jrls(
         impl.template matvec_membrane_jrls<opfunc>(
             out + out_offset, inp + inp_offset, wgt + wgt_offset,
             loc, size + nbatch, stride_inp + nbatch, stride_wgt + nbatch,
-            osc, isc, kernel);
+            osc, isc, wsc, kernel);
     }
 }
 
@@ -1229,9 +1249,14 @@ void diag_membrane_jrls(
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
     offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out, _stride_out);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t osc = stride_out[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);    // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_membrane_rls];
@@ -1245,7 +1270,7 @@ void diag_membrane_jrls(
 
         impl.template diag_membrane_jrls<opfunc>(
             out + out_offset, wgt + wgt_offset,
-            loc, size + nbatch, stride_wgt + nbatch, osc, kernel);
+            loc, size + nbatch, stride_wgt + nbatch, osc, wsc, kernel);
     }
 }
 
@@ -1285,11 +1310,16 @@ void relax_membrane_jrls_(
     offset_t stride_sol[nall+1];  fillfrom<nall+1>(stride_sol, _stride_sol);
     offset_t stride_hes[nall+1];  fillfrom<nall+1>(stride_hes, _stride_hes);
     offset_t stride_grd[nall+1];  fillfrom<nall+1>(stride_grd, _stride_grd);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t osc = stride_sol[nall];
     offset_t hsc = stride_hes[nall];
     offset_t gsc = stride_grd[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);    // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_membrane_rls];
@@ -1317,13 +1347,13 @@ void relax_membrane_jrls_(
         impl.template matvec_membrane_jrls<isub>(
             val, sol + sol_offset, wgt + wgt_offset,
             loc, size + nbatch, stride_sol + nbatch, stride_wgt + nbatch,
-            static_cast<offset_t>(1), osc, kernel);
+            static_cast<offset_t>(1), osc, wsc, kernel);
 
         // diagonal
         impl.template diag_membrane_jrls<set>(
             diag, wgt + wgt_offset, loc,
             size + nbatch, stride_wgt + nbatch,
-            static_cast<offset_t>(1), kernel);
+            static_cast<offset_t>(1), wsc, kernel);
 
         // sol += (hes + diag) \ (grad - conv(sol))
         PosDef::relax_(
@@ -1579,10 +1609,15 @@ void matvec_bending_jrls(
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
     offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out, _stride_out);
     offset_t stride_inp[nall+1];  fillfrom<nall+1>(stride_inp, _stride_inp);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t osc = stride_out[nall];
     offset_t isc = stride_inp[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);  // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_bending_rls];
@@ -1598,7 +1633,7 @@ void matvec_bending_jrls(
         impl.template matvec_bending_jrls<opfunc>(
             out + out_offset, inp + inp_offset, wgt + wgt_offset,
             loc, size + nbatch, stride_inp + nbatch, stride_wgt + nbatch,
-            osc, isc, kernel);
+            osc, isc, wsc, kernel);
     }
 }
 
@@ -1630,9 +1665,14 @@ void diag_bending_jrls(
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
     offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out, _stride_out);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t osc = stride_out[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);    // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_bending_rls];
@@ -1646,7 +1686,7 @@ void diag_bending_jrls(
 
         impl.template diag_bending_jrls<opfunc>(
             out + out_offset, wgt + wgt_offset,
-            loc, size + nbatch, stride_wgt + nbatch, osc, kernel);
+            loc, size + nbatch, stride_wgt + nbatch, osc, wsc, kernel);
     }
 }
 
@@ -1687,11 +1727,16 @@ void relax_bending_jrls_(
     offset_t stride_sol[nall+1];  fillfrom<nall+1>(stride_sol, _stride_sol);
     offset_t stride_hes[nall+1];  fillfrom<nall+1>(stride_hes, _stride_hes);
     offset_t stride_grd[nall+1];  fillfrom<nall+1>(stride_grd, _stride_grd);
-    offset_t stride_wgt[nall];    fillfrom<nall>(stride_wgt, _stride_wgt);
+    offset_t stride_wgt[nall+1];  fillfrom<nall+1>(stride_wgt, _stride_wgt);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t osc = stride_sol[nall];
     offset_t hsc = stride_hes[nall];
     offset_t gsc = stride_grd[nall];
+    // JRLS: wgt has wc=nc (a genuine per-channel weight map), so the
+    // per-channel stride must be the weight tensor's real last-dim stride --
+    // unlike RLS (wc=1), which forces wsc to 0 to broadcast. See
+    // fastfields-cpu-lib#65.
+    offset_t wsc = stride_wgt[nall];
     offset_t numel = prod<nall>(size);    // no outer loop across channels
 
     reduce_t kernel[Impl::kernelsize_bending_rls];
@@ -1719,13 +1764,13 @@ void relax_bending_jrls_(
         impl.template matvec_bending_jrls<isub>(
             val, sol + sol_offset, wgt + wgt_offset,
             loc, size + nbatch, stride_sol + nbatch, stride_wgt + nbatch,
-            static_cast<offset_t>(1), osc, kernel);
+            static_cast<offset_t>(1), osc, wsc, kernel);
 
         // diagonal
         impl.template diag_bending_jrls<set>(
             diag, wgt + wgt_offset, loc,
             size + nbatch, stride_wgt + nbatch,
-            static_cast<offset_t>(1), kernel);
+            static_cast<offset_t>(1), wsc, kernel);
 
         // sol += (hes + diag) \ (grad - conv(sol))
         PosDef::relax_(
@@ -2408,7 +2453,7 @@ CUHOST void matvec_absolute_jrls(
         d_size       = copyToDevice(size,       nall + 1);
         d_stride_out = copyToDevice(stride_out, nall + 1);
         d_stride_inp = copyToDevice(stride_inp, nall + 1);
-        d_stride_wgt = copyToDevice(stride_wgt, nall);
+        d_stride_wgt = copyToDevice(stride_wgt, nall + 1);
         d_abs        = copyToDevice(absolute,   nc);
         FF_REGFIELD_LAUNCH(matvec_absolute_jrls,
             out, inp, wgt, d_size, d_stride_out, d_stride_inp, d_stride_wgt, d_abs)
@@ -2442,7 +2487,7 @@ CUHOST void diag_absolute_jrls(
     try {
         d_size       = copyToDevice(size,       nall + 1);
         d_stride_out = copyToDevice(stride_out, nall + 1);
-        d_stride_wgt = copyToDevice(stride_wgt, nall);
+        d_stride_wgt = copyToDevice(stride_wgt, nall + 1);
         d_abs        = copyToDevice(absolute,   nc);
         FF_REGFIELD_LAUNCH(diag_absolute_jrls,
             out, wgt, d_size, d_stride_out, d_stride_wgt, d_abs)
@@ -2483,7 +2528,7 @@ CUHOST void relax_absolute_jrls_(
         d_ss   = copyToDevice(stride_sol, nall + 1);
         d_sh   = copyToDevice(stride_hes, nall + 1);
         d_sg   = copyToDevice(stride_grd, nall + 1);
-        d_sw   = copyToDevice(stride_wgt, nall);
+        d_sw   = copyToDevice(stride_wgt, nall + 1);
         d_abs  = copyToDevice(absolute,   nc);
         for (offset_t col = 0; col < ncol * nb_iter; ++col)
             FF_REGFIELD_LAUNCH_RELAX(relax_absolute_jrls_,
@@ -2654,7 +2699,7 @@ CUHOST void matvec_membrane_jrls(
         d_size       = copyToDevice(size,       nall + 1);
         d_stride_out = copyToDevice(stride_out, nall + 1);
         d_stride_inp = copyToDevice(stride_inp, nall + 1);
-        d_stride_wgt = copyToDevice(stride_wgt, nall);
+        d_stride_wgt = copyToDevice(stride_wgt, nall + 1);
         d_vx         = copyToDevice(voxel_size, static_cast<offset_t>(ndim));
         d_abs        = copyToDevice(absolute,   nc);
         d_mem        = copyToDevice(membrane,   nc);
@@ -2693,7 +2738,7 @@ CUHOST void diag_membrane_jrls(
     try {
         d_size       = copyToDevice(size,       nall + 1);
         d_stride_out = copyToDevice(stride_out, nall + 1);
-        d_stride_wgt = copyToDevice(stride_wgt, nall);
+        d_stride_wgt = copyToDevice(stride_wgt, nall + 1);
         d_vx         = copyToDevice(voxel_size, static_cast<offset_t>(ndim));
         d_abs        = copyToDevice(absolute,   nc);
         d_mem        = copyToDevice(membrane,   nc);
@@ -2738,7 +2783,7 @@ CUHOST void relax_membrane_jrls_(
         d_ss   = copyToDevice(stride_sol, nall + 1);
         d_sh   = copyToDevice(stride_hes, nall + 1);
         d_sg   = copyToDevice(stride_grd, nall + 1);
-        d_sw   = copyToDevice(stride_wgt, nall);
+        d_sw   = copyToDevice(stride_wgt, nall + 1);
         d_vx   = copyToDevice(voxel_size, static_cast<offset_t>(ndim));
         d_abs  = copyToDevice(absolute,   nc);
         d_mem  = copyToDevice(membrane,   nc);
@@ -2916,7 +2961,7 @@ CUHOST void matvec_bending_jrls(
         d_size       = copyToDevice(size,       nall + 1);
         d_stride_out = copyToDevice(stride_out, nall + 1);
         d_stride_inp = copyToDevice(stride_inp, nall + 1);
-        d_stride_wgt = copyToDevice(stride_wgt, nall);
+        d_stride_wgt = copyToDevice(stride_wgt, nall + 1);
         d_vx         = copyToDevice(voxel_size, static_cast<offset_t>(ndim));
         d_abs        = copyToDevice(absolute,   nc);
         d_mem        = copyToDevice(membrane,   nc);
@@ -2956,7 +3001,7 @@ CUHOST void diag_bending_jrls(
     try {
         d_size       = copyToDevice(size,       nall + 1);
         d_stride_out = copyToDevice(stride_out, nall + 1);
-        d_stride_wgt = copyToDevice(stride_wgt, nall);
+        d_stride_wgt = copyToDevice(stride_wgt, nall + 1);
         d_vx         = copyToDevice(voxel_size, static_cast<offset_t>(ndim));
         d_abs        = copyToDevice(absolute,   nc);
         d_mem        = copyToDevice(membrane,   nc);
@@ -3003,7 +3048,7 @@ CUHOST void relax_bending_jrls_(
         d_ss   = copyToDevice(stride_sol, nall + 1);
         d_sh   = copyToDevice(stride_hes, nall + 1);
         d_sg   = copyToDevice(stride_grd, nall + 1);
-        d_sw   = copyToDevice(stride_wgt, nall);
+        d_sw   = copyToDevice(stride_wgt, nall + 1);
         d_vx   = copyToDevice(voxel_size, static_cast<offset_t>(ndim));
         d_abs  = copyToDevice(absolute,   nc);
         d_mem  = copyToDevice(membrane,   nc);
